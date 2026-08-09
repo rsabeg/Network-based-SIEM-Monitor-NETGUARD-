@@ -26,7 +26,7 @@ Every remediation action shown in the dashboard is a **human-authorized recommen
 
 ---
 
-## ⚡ Key Features
+##  Key Features
 
 - **Live Telemetry Engine** — event streaming powered by WebSockets (`Socket.io`) for low-latency incident visualization across every connected dashboard session.
 - **8-Module Detection Engine** — port scanning, SYN flood, ICMP flood, stealth scans (NULL/FIN/XMAS), admin-port brute force, DNS-tunneling heuristic, anomalous packet size (EMA-baseline anomaly detection), and known-bad IP matching.
@@ -58,7 +58,7 @@ Every remediation action shown in the dashboard is a **human-authorized recommen
 
 ---
 
-## 🏗️ System Architecture
+##  System Architecture
 
 ```
 ┌──────────────────┐     HTTP POST      ┌───────────────────┐     Socket.io      ┌───────────────────┐
@@ -92,7 +92,7 @@ The `sensor/` module doubles as its own test harness — point it at a bridged V
 
 ---
 
-## 🚀 Installation
+##  Installation
 
 ### Prerequisites
 - Windows + [XAMPP](https://www.apachefriends.org/) (MySQL/MariaDB)
@@ -167,4 +167,5 @@ MIT — see [LICENSE](LICENSE)
 ## ✍️ Author
 
 **Ragib Shahriar Abeg**
-Cyber Security Engineering Student, University of Frontier Technology, Bangladesh
+Cyber Security Engineering Student 
+University of Frontier Technology, Bangladesh
