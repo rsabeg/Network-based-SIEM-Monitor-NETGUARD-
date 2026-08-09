@@ -166,6 +166,6 @@ MIT — see [LICENSE](LICENSE)
 
 ## ✍️ Author
 
-**Ragib Shahriar Abeg**
-Cyber Security Engineering Student 
+**Ragib Shahriar Abeg**  
+Cyber Security Engineering Student   
 University of Frontier Technology, Bangladesh
