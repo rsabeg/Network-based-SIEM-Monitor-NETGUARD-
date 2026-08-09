@@ -168,4 +168,5 @@ MIT — see [LICENSE](LICENSE)
 
 **Ragib Shahriar Abeg**  
 Cyber Security Engineering Student   
-University of Frontier Technology, Bangladesh
+University of Frontier Technology, Bangladesh    
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-rsabeg-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/rsabeg/)
