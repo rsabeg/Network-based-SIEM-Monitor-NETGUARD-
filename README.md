@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🛡️ Network-based SIEM Monitor (NETGUARD)
+#  Network-based SIEM Monitor (NETGUARD)
 
 ### Enterprise Threat Telemetry, Behavioral Detection & SOC Dashboard
 
