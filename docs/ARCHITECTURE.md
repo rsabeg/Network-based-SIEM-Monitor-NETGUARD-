@@ -48,7 +48,7 @@ A "session" = one continuous run of the Node backend process, from boot to a cle
 
 ## 7. Database schema (run in order)
 
-1. `netguard_schema.sql` — `alerts`, `traffic_samples`, `sessions`, base `users`
+1. `netguard_schema.sql` — base `users`, `alerts`, `traffic_samples`
 2. `netguard_schema_update_2.sql` — Simulated Remediation columns on `alerts`
 3. `netguard_schema_update_3.sql` — `sessions` table (backend run history)
 4. `netguard_schema_update_4.sql` — `users` table re-assertion (`IF NOT EXISTS`)
