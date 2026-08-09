@@ -121,7 +121,7 @@ g++ ids_real.cpp -o ids_real.exe -IC:\WpdPack\Include -LC:\WpdPack\Lib\x64 -lwpc
 
 ---
 
-## 📡 API Reference
+##  API Reference
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
@@ -140,7 +140,7 @@ g++ ids_real.cpp -o ids_real.exe -IC:\WpdPack\Include -LC:\WpdPack\Lib\x64 -lwpc
 
 ---
 
-## 🗺️ Roadmap
+##  Roadmap
 
 - [x] Simulated Remediation (Authorize-to-Act)
 - [x] Full auth system (register / login / session / RBAC)
