@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>NETGUARD - Live Alert Dashboard</title>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #05070a;
+    --panel: #0a0f18;
+    --panel-raised: #0d1420;
+    --line: #1b2836;
+    --line-bright: #2c4256;
+    --text: #d7e4ea;
+    --text-dim: #7690a0;
+    --text-faint: #445563;
+    --cyan: #4fc3f7;
+    --cyan-dim: #2a7fa8;
+    --red: #ff4757;
+    --red-dim: #7f1d1d;
+    --amber: #f0a83c;
+    --amber-dim: #78350f;
+    --green: #4ade80;
+    --mono: 'JetBrains Mono', 'Consolas', monospace;
+    --display: 'Inter', 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    background: var(--void);
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .classification-bar {
+    background: #000000;
+    border-bottom: 1px solid var(--line);
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-align: center;
+    padding: 4px 0;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .classification-bar span { color: var(--cyan-dim); }
+
+  /* ================= APP SHELL ================= */
+  .app-shell {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+
+  /* ---- Sidebar ---- */
+  .sidebar {
+    width: 224px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.18s ease;
+    overflow: hidden;
+  }
+  .sidebar.collapsed { width: 60px; }
+
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 14px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  .sidebar-toggle {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sidebar-toggle:hover { color: var(--cyan); border-color: var(--cyan-dim); }
+  .sidebar-toggle svg { width: 16px; height: 16px; transition: transform 0.2s ease; }
+  .sidebar.collapsed .sidebar-toggle svg { transform: rotate(180deg); }
+
+  .brand {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.6px;
+    white-space: nowrap;
+    color: var(--text);
+  }
+  .sidebar.collapsed .brand { display: none; }
+
+  .nav-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 14px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    padding: 12px 14px 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: var(--display);
+    font-size: 13.5px;
+    font-weight: 500;
+    text-align: left;
+    white-space: nowrap;
+    width: 100%;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .nav-item svg { flex-shrink: 0; width: 18px; height: 18px; opacity: 0.85; }
+  .nav-item span.label { flex: 1; letter-spacing: 0.1px; }
+  .nav-item:hover { background: var(--panel-raised); color: var(--text); }
+  .nav-item.active {
+    background: linear-gradient(90deg, rgba(79,195,247,0.14), rgba(79,195,247,0.04));
+    color: var(--cyan);
+    font-weight: 600;
+  }
+  .nav-item.active svg { opacity: 1; }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan-dim);
+  }
+  .sidebar.collapsed .nav-item span.label,
+  .sidebar.collapsed .nav-badge { display: none; }
+  .sidebar.collapsed .nav-item { justify-content: center; padding-left: 14px; }
+
+  .nav-badge {
+    background: var(--red);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-family: var(--mono);
+    display: none;
+  }
+
+  .sidebar-footer {
+    padding: 12px 14px;
+    border-top: 1px solid var(--line);
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.4px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .sidebar.collapsed .sidebar-footer { display: none; }
+
+  /* ---- Content area ---- */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+  .content-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  .section-title-wrap { display: flex; flex-direction: column; gap: 2px; }
+  .section-title {
+    font-family: var(--display);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  .section-sub {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: 0.3px;
+  }
+  .status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 7px; box-shadow: 0 0 10px var(--green); animation: pulse 2s ease-in-out infinite; }
+  .status.offline { background: var(--red); box-shadow: 0 0 10px var(--red); animation: none; opacity: 1; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .clock { font-family: var(--mono); color: var(--text-faint); font-size: 11px; text-align: right; letter-spacing: 0.5px; display: flex; align-items: center; }
+  .clock .sys-tag { color: var(--cyan-dim); margin-right: 10px; }
+
+  .section-body {
+    flex: 1;
+    min-height: 0;
+    padding: 18px 24px;
+    overflow: hidden;
+  }
+  .page { display: none; height: 100%; flex-direction: column; gap: 14px; min-height: 0; }
+  .page.active { display: flex; }
+
+  /* ================= CARDS / SHARED WIDGETS ================= */
+  .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; flex-shrink: 0; }
+  .stat-card {
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 16px 18px;
+  }
+  .stat-label { color: var(--text-dim); font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; }
+  .stat-value { font-family: var(--display); font-size: 27px; font-weight: 700; line-height: 1; letter-spacing: 0.5px; }
+  .stat-sub { color: var(--text-faint); font-family: var(--mono); font-size: 10.5px; margin-top: 6px; letter-spacing: 0.3px; }
+  .stat-value.level-LOW { color: var(--cyan); }
+  .stat-value.level-ELEVATED { color: var(--amber); }
+  .stat-value.level-CRITICAL { color: var(--red); }
+
+  .page-grid-2 { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .status-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; gap: 14px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .full-card { flex: 1; }
+  .card h2 {
+    margin: 0 0 10px 0; font-family: var(--display); font-size: 12.5px; font-weight: 600;
+    color: var(--cyan); text-transform: uppercase; letter-spacing: 1.1px; flex-shrink: 0;
+    padding-bottom: 8px; border-bottom: 1px solid var(--line);
+  }
+  .card h2 .hint { color: var(--text-faint); font-weight: normal; text-transform: none; letter-spacing: 0; font-family: 'Inter', sans-serif; }
+
+  /* ---- Card headers that also carry a Clear button (Step 4) ---- */
+  .card h2.with-clear {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .card h2.with-clear > span { min-width: 0; }
+  .btn-clear {
+    font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    background: none; border: 1px solid var(--line-bright); color: var(--text-dim);
+    border-radius: 5px; padding: 4px 10px; cursor: pointer; text-transform: uppercase;
+    flex-shrink: 0; transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .btn-clear:hover { color: var(--cyan); border-color: var(--cyan-dim); background: rgba(79,195,247,0.06); }
+  .btn-clear:active { opacity: 0.7; }
+
+  .alert-scroll { flex: 1; overflow-y: auto; min-height: 100px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    text-align: left; color: var(--text-dim); padding: 7px 8px; border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-weight: 600; font-size: 10.5px; letter-spacing: 0.8px; text-transform: uppercase;
+    position: sticky; top: 0; background: var(--panel);
+  }
+  td { padding: 7px 8px; border-bottom: 1px solid #131c28; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
+  tr:hover td { background: #0d1520; }
+  tr.new-row { animation: flash 1.2s ease-out; }
+  @keyframes flash { 0% { background: rgba(79,195,247,0.18); } 100% { background: transparent; } }
+  .sev {
+    padding: 3px 9px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px;
+    border-radius: 4px; display: inline-block;
+  }
+  .sev-high { background: rgba(255,71,87,0.14); color: var(--red); }
+  .sev-medium { background: rgba(240,168,60,0.14); color: var(--amber); }
+  .sev-low { background: rgba(79,195,247,0.14); color: var(--cyan); }
+  .mitre { color: var(--cyan); font-family: var(--mono); font-size: 11.5px; }
+  .loc { color: var(--text-dim); font-family: 'Inter', sans-serif; font-size: 12px; }
+  .loc .flag-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; }
+  .loc.external .flag-dot { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .loc.internal .flag-dot { background: var(--text-faint); }
+  .score-bar-wrap { display: flex; align-items: center; gap: 7px; }
+  .score-bar-track { width: 46px; height: 4px; background: #060a10; overflow: hidden; border-radius: 2px; }
+  .score-bar-fill { height: 100%; border-radius: 2px; }
+  .score-num { font-family: var(--mono); font-size: 11.5px; width: 22px; font-weight: 600; }
+  .empty { color: var(--text-faint); padding: 16px; text-align: center; font-family: var(--mono); font-size: 12px; letter-spacing: 0.5px; }
+
+  .chart-wrap { position: relative; flex: 1; width: 100%; min-height: 0; }
+  .stat-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #131c28; font-size: 12.5px; font-family: var(--mono); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .count { color: var(--cyan); font-family: var(--mono); font-weight: 700; }
+
+  .technique-list { flex: 1; overflow-y: auto; min-height: 0; }
+  .technique-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #131c28; font-size: 12.5px; }
+  .technique-row:last-child { border-bottom: none; }
+  .technique-row .tname { color: var(--text); font-family: 'Inter', sans-serif; }
+  .technique-row .tid { color: var(--text-faint); font-family: var(--mono); font-size: 10.5px; margin-left: 5px; }
+  .technique-row .tcount { color: var(--cyan); font-family: var(--mono); font-weight: 700; }
+
+  .traffic-feed {
+    font-family: var(--mono);
+    font-size: 12px;
+    flex: 1;
+    overflow-y: auto;
+    background: #000000;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 10px;
+    min-height: 100px;
+  }
+  .traffic-line { color: var(--green); padding: 1.5px 0; opacity: 0; animation: fadeIn 0.4s ease-out forwards; white-space: nowrap; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  .traffic-line .dim { color: var(--text-faint); }
+
+  .origin-list { flex: 1; overflow-y: auto; min-height: 100px; }
+  .origin-row { padding: 10px 0; border-bottom: 1px solid #131c28; }
+  .origin-row:last-child { border-bottom: none; }
+  .origin-top { display: flex; justify-content: space-between; font-size: 12.5px; font-family: var(--mono); }
+  .origin-ip { font-family: var(--mono); color: var(--text); font-weight: 600; }
+  .origin-place { color: var(--text-dim); font-size: 11.5px; margin-top: 3px; font-family: 'Inter', sans-serif; }
+  .origin-badge { font-size: 9.5px; padding: 2px 8px; font-weight: 700; letter-spacing: 0.4px; border-radius: 4px; }
+
+  /* ---- Recommended Actions ---- */
+  .actions-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .action-group-label {
+    font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-faint); margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line);
+  }
+  .action-group-label:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+  .action-row {
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .action-row.authorized { border-color: var(--green); }
+  .action-row.dismissed { opacity: 0.55; }
+  .action-row.no-action { opacity: 0.5; }
+  .action-info { min-width: 0; }
+  .action-source { font-family: var(--mono); font-size: 12.5px; color: var(--text); font-weight: 600; }
+  .action-source .tag {
+    font-family: var(--mono); font-size: 9.5px; color: var(--text-faint); margin-left: 8px;
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .action-desc { color: var(--text-dim); font-size: 12px; margin-top: 4px; font-family: 'Inter', sans-serif; }
+  .action-buttons { display: flex; gap: 8px; flex-shrink: 0; }
+  .btn {
+    font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+    border-radius: 5px; padding: 7px 13px; border: 1px solid transparent; cursor: pointer;
+    text-transform: uppercase; transition: opacity 0.15s ease;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-authorize { background: rgba(74,222,128,0.16); color: var(--green); border-color: rgba(74,222,128,0.35); }
+  .btn-dismiss { background: rgba(255,71,87,0.12); color: var(--red); border-color: rgba(255,71,87,0.3); }
+  .action-status-pill {
+    font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.4px;
+    padding: 5px 11px; border-radius: 5px; text-transform: uppercase; flex-shrink: 0;
+  }
+  .action-status-pill.authorized { background: rgba(74,222,128,0.14); color: var(--green); }
+  .action-status-pill.dismissed { background: rgba(255,71,87,0.1); color: var(--text-faint); }
+  .action-status-pill.none { background: rgba(118,144,160,0.12); color: var(--text-faint); }
+  .simulated-note {
+    color: var(--text-faint); font-family: var(--mono); font-size: 10px; margin-top: 10px;
+    letter-spacing: 0.3px; padding-top: 10px; border-top: 1px solid var(--line); flex-shrink: 0;
+  }
+
+  /* ---- System Status page ---- */
+  .status-card .status-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #131c28; font-size: 12.5px; }
+  .status-card .status-row:last-child { border-bottom: none; }
+  .status-card .status-row .k { color: var(--text-dim); font-family: 'Inter', sans-serif; }
+  .status-card .status-row .v { color: var(--text); font-family: var(--mono); font-weight: 600; text-align: right; }
+  .rule-chip-list { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; flex: 1; overflow-y: auto; }
+  .rule-chip {
+    background: var(--panel-raised); border: 1px solid var(--line); border-radius: 5px;
+    padding: 5px 10px; font-family: var(--mono); font-size: 10.5px; color: var(--text-dim);
+  }
+  .rule-chip.confirmed { color: var(--green); border-color: rgba(74,222,128,0.3); }
+  .status-note {
+    color: var(--text-dim); font-size: 12.5px; line-height: 1.6; font-family: 'Inter', sans-serif; flex: 1; overflow-y: auto;
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--void); }
+  ::-webkit-scrollbar-thumb { background: var(--line-bright); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--cyan-dim); }
+
+  @media (max-width: 980px) {
+    .sidebar { width: 60px; }
+    .sidebar .brand, .sidebar .nav-item span.label, .nav-badge, .sidebar-footer { display: none; }
+    .sidebar-toggle { display: none; }
+    .page-grid-2, .status-grid { grid-template-columns: 1fr; grid-auto-rows: auto; }
+    .stat-strip { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="classification-bar">UNCLASSIFIED &mdash; <span>TRAINING / DEMONSTRATION SYSTEM</span> &mdash; NOT FOR OPERATIONAL USE</div>
+
+<div class="app-shell">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <button class="sidebar-toggle" id="sidebarToggle" title="Collapse menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 12 4 18"/><line x1="11" y1="7" x2="21" y2="7"/><line x1="11" y1="12" x2="21" y2="12"/><line x1="11" y1="17" x2="21" y2="17"/></svg>
+      </button>
+      <div class="brand">NETGUARD</div>
+    </div>
+    <nav class="nav-list" id="navList">
+      <button class="nav-item active" data-section="overview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M9 21V12h6v9"/></svg>
+        <span class="label">Overview</span>
+      </button>
+      <button class="nav-item" data-section="live-alerts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        <span class="label">Live Alerts</span>
+      </button>
+      <button class="nav-item" data-section="intel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg>
+        <span class="label">Threat Intelligence</span>
+      </button>
+      <button class="nav-item" data-section="analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span class="label">Analytics</span>
+      </button>
+      <button class="nav-item" data-section="traffic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span class="label">Live Traffic Monitor</span>
+      </button>
+      <button class="nav-item" data-section="sessionlog">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+        <span class="label">Session Log</span>
+      </button>
+      <button class="nav-item" data-section="status">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/><line x1="20" y1="15" x2="23" y2="15"/></svg>
+        <span class="label">System Status</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div><span class="status" id="footerStatusDot"></span><span id="footerStatusText">SENSOR LINK ACTIVE</span></div>
+      <div id="loggedInAs" style="margin-top:6px; color:var(--text-faint);"></div>
+      <button id="logoutBtn" style="margin-top:8px; width:100%; background:none; border:1px solid var(--line-bright); color:var(--text-dim); font-family:var(--mono); font-size:10px; letter-spacing:0.5px; text-transform:uppercase; border-radius:5px; padding:6px 0; cursor:pointer;">Log Out</button>
+    </div>
+  </aside>
+
+  <!-- ================= CONTENT ================= -->
+  <main class="content">
+    <div class="content-topbar">
+      <div class="section-title-wrap">
+        <div class="section-title" id="sectionTitle">Overview</div>
+        <div class="section-sub" id="sectionSub">At-a-glance summary</div>
+      </div>
+      <div class="clock"><span class="sys-tag">SYS: ONLINE</span><span id="clock">--</span></div>
+    </div>
+
+    <div class="section-body">
+
+      <!-- ---- OVERVIEW ---- -->
+      <section id="section-overview" class="page active">
+        <div class="stat-strip">
+          <div class="stat-card">
+            <div class="stat-label">Total Alerts</div>
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-sub" id="statTotalSub">since backend start</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">High Severity</div>
+            <div class="stat-value" id="statHigh">0</div>
+            <div class="stat-sub" id="statHighSub">0% of total</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Overall Threat Level</div>
+            <div class="stat-value level-LOW" id="statLevel">-</div>
+            <div class="stat-sub" id="statLevelSub">avg. score of recent alerts</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Active Sources</div>
+            <div class="stat-value" id="statSources">0</div>
+            <div class="stat-sub" id="statSourcesSub">distinct source IPs</div>
+          </div>
+        </div>
+        <div class="card full-card">
+          <h2 class="with-clear"><span>Recent Activity <span class="hint">(latest 5 &mdash; see Live Alerts for the full feed)</span></span><button class="btn-clear" onclick="clearRecentActivity()">Clear</button></h2>
+          <div class="alert-scroll">
+            <table>
+              <thead><tr><th>Time</th><th>Source IP</th><th>Event</th><th>Severity</th><th>Threat Score</th></tr></thead>
+              <tbody id="recentActivityBody"><tr><td colspan="5" class="empty">Waiting for alerts...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---- LIVE ALERTS ---- -->
+      <section id="section-live-alerts" class="page">
+        <div class="card full-card">
+          <h2 class="with-clear"><span>Live Alert Feed</span><button class="btn-clear" onclick="clearLiveAlerts()">Clear</button></h2>
+          <div class="alert-scroll">
+            <table>
+              <thead>
+                <tr><th>Time</th><th>Source IP</th><th>Event</th><th>Severity</th><th>MITRE ATT&CK</th><th>Location</th><th>Threat Score</th></tr>
+              </thead>
+              <tbody id="alertBody">
+                <tr><td colspan="7" class="empty">Waiting for alerts...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---- THREAT INTELLIGENCE ---- -->
+      <section id="section-intel" class="page">
+        <div class="page-grid-2">
+          <div class="card">
+            <h2>Top MITRE Techniques</h2>
+            <div class="technique-list" id="techniqueList">
+              <div class="empty">No alerts yet</div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Threat Origins <span class="hint">(geolocated sources)</span></h2>
+            <div class="origin-list" id="originList">
+              <div class="empty">No geolocated alerts yet</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---- ANALYTICS ---- -->
+      <section id="section-analytics" class="page">
+        <div class="page-grid-2">
+          <div class="card">
+            <h2>Alert Breakdown</h2>
+            <div class="chart-wrap">
+              <canvas id="chart"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Breakdown by Event Type</h2>
+            <div id="statsList" style="flex:1; overflow-y:auto; min-height:0;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---- LIVE TRAFFIC MONITOR ---- -->
+      <section id="section-traffic" class="page">
+        <div class="card full-card">
+          <h2 class="with-clear"><span>Live Traffic Monitor <span class="hint">(normal traffic sample &mdash; not alerts)</span></span><button class="btn-clear" onclick="clearTrafficMonitor()">Clear</button></h2>
+          <div class="traffic-feed" id="trafficFeed">
+            <div class="traffic-line dim">Waiting for traffic samples...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---- SESSION LOG ---- -->
+      <section id="section-sessionlog" class="page">
+        <div class="card full-card">
+          <h2>Session History <span class="hint">(one row per backend run &mdash; start/stop, not browser refreshes)</span></h2>
+          <div class="alert-scroll">
+            <table>
+              <thead>
+                <tr><th>Session</th><th>Started</th><th>Ended</th><th>Duration</th><th>Total Alerts</th><th>High Severity</th></tr>
+              </thead>
+              <tbody id="sessionLogBody">
+                <tr><td colspan="6" class="empty">Loading session history...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---- SYSTEM STATUS ---- -->
+      <section id="section-status" class="page">
+        <div class="status-grid">
+          <div class="card status-card">
+            <h2>Platform Status</h2>
+            <div class="status-row"><span class="k"><span class="status" id="dotDashboard"></span>Dashboard</span><span class="v" id="lblDashboard">Operational</span></div>
+            <div class="status-row"><span class="k"><span class="status" id="dotDatabase"></span>Database</span><span class="v" id="lblDatabase">Connected</span></div>
+            <div class="status-row"><span class="k"><span class="status" id="dotRealtime"></span>Real-Time Feed</span><span class="v" id="lblRealtime">Connected</span></div>
+            <div class="status-row"><span class="k">Session started</span><span class="v" id="sessionStartTime">--</span></div>
+            <div class="status-row"><span class="k">Session uptime</span><span class="v" id="dashboardUptime">--</span></div>
+          </div>
+          <div class="card status-card">
+            <h2>Sensor Status</h2>
+            <div class="status-row"><span class="k"><span class="status" id="dotSensorLink"></span>Sensor Link</span><span class="v" id="lblSensorLink">Active</span></div>
+            <div class="status-row"><span class="k">Last alert received</span><span class="v" id="lastAlertReceived">--</span></div>
+            <div class="status-row"><span class="k">Detection modules</span><span class="v">8 active</span></div>
+            <div class="status-row"><span class="k">Detection method</span><span class="v">Signature + Behavioral Anomaly</span></div>
+          </div>
+          <div class="card status-card">
+            <h2>Threat Categories Monitored</h2>
+            <div class="rule-chip-list">
+              <span class="rule-chip">Port Scanning</span>
+              <span class="rule-chip">SYN Flood</span>
+              <span class="rule-chip">Anomalous Traffic</span>
+              <span class="rule-chip">ICMP Flood</span>
+              <span class="rule-chip">Stealth Scans</span>
+              <span class="rule-chip">Brute Force</span>
+              <span class="rule-chip">DNS Tunneling</span>
+              <span class="rule-chip">Known-Bad IPs</span>
+            </div>
+          </div>
+          <div class="card status-card" style="grid-column: span 3;">
+            <h2>SOC Operations Policy</h2>
+            <div class="status-row"><span class="k">Automated Response</span><span class="v">Disabled — Manual Authorization Required</span></div>
+            <div class="status-row"><span class="k">Response SLA — High Severity</span><span class="v">15 minutes</span></div>
+            <div class="status-row"><span class="k">Response SLA — Medium Severity</span><span class="v">1 hour</span></div>
+            <div class="status-row"><span class="k">Response SLA — Low Severity</span><span class="v">4 hours</span></div>
+            <div class="status-row"><span class="k">Escalation Path</span><span class="v">Tier 1 → Tier 2 → IR Lead</span></div>
+            <div class="status-row"><span class="k">Data Retention Policy</span><span class="v">90 days</span></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+// ---------------------------------------------------------------------
+// AUTH GATE - Step 4/5. Runs first, before anything else on this page.
+// If there's no valid session, bounce to login.html immediately so the
+// dashboard (and its data-fetching calls) never render for a logged-out
+// visitor. If logged in, show username/role in the sidebar footer and
+// wire up the logout button.
+// ---------------------------------------------------------------------
+async function checkAuthAndInit() {
+  try {
+    const resp = await fetch('/api/auth/me', { credentials: 'same-origin' });
+    if (!resp.ok) {
+      window.location.href = '/login.html';
+      return;
+    }
+    const user = await resp.json();
+    document.getElementById('loggedInAs').textContent = `${user.username} (${user.role})`;
+    initDashboard();
+  } catch (err) {
+    window.location.href = '/login.html';
+  }
+}
+
+document.getElementById('logoutBtn') && document.addEventListener('click', async (e) => {
+  if (e.target.id !== 'logoutBtn') return;
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+  } finally {
+    window.location.href = '/login.html';
+  }
+});
+
+checkAuthAndInit();
+
+// ---------------------------------------------------------------------
+// Everything below this line is the existing dashboard logic, now
+// wrapped in initDashboard() so it only runs AFTER the auth check
+// above confirms a valid session.
+// ---------------------------------------------------------------------
+function initDashboard() {
+const socket = io();
+const alertBody = document.getElementById('alertBody');
+let firstAlert = true;
+let allAlerts = []; // running client-side history for stats/scoring panels
+let sessionStartedAt = null; // set from the BACKEND's session record, not the browser clock
+
+// This user's three Clear-button cursors, fetched from /api/clears on load
+// (see loadClearCursorsThenData() below). null = that view was never
+// cleared by this user. Never mutated by hand except by postClearCursor()
+// after a successful POST /api/clears, so it always reflects what the
+// server actually has stored.
+let clearCursors = { recent_activity: null, live_alerts: null, traffic: null };
+
+// True if `timestampStr` is at or before `cursor` - i.e. it should stay
+// hidden because it existed at-or-before the moment this user last hit
+// Clear on that view. A null cursor (never cleared) means nothing is hidden.
+function isBeforeOrAtCursor(timestampStr, cursor) {
+  if (!cursor) return false;
+  return new Date(timestampStr).getTime() <= new Date(cursor).getTime();
+}
+
+// ================= NAVIGATION =================
+const SECTION_META = {
+  overview:      { title: 'Overview',              sub: 'At-a-glance summary' },
+  'live-alerts': { title: 'Live Alerts',            sub: 'Full alert feed' },
+  intel:         { title: 'Threat Intelligence',    sub: 'Techniques & geolocated origins' },
+  analytics:     { title: 'Analytics',              sub: 'Alert breakdown by event type' },
+  traffic:       { title: 'Live Traffic Monitor',   sub: 'Normal traffic sample — not alerts' },
+  sessionlog:    { title: 'Session Log',            sub: 'Backend run history — start/stop, not refreshes' },
+  status:        { title: 'System Status',          sub: 'Sensor & backend info' }
+};
+
+const navItems = document.querySelectorAll('.nav-item');
+const pages = document.querySelectorAll('.page');
+navItems.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sec = btn.dataset.section;
+    navItems.forEach(b => b.classList.toggle('active', b === btn));
+    pages.forEach(p => p.classList.toggle('active', p.id === 'section-' + sec));
+    document.getElementById('sectionTitle').textContent = SECTION_META[sec].title;
+    document.getElementById('sectionSub').textContent = SECTION_META[sec].sub;
+    if (sec === 'analytics' && chart) chart.resize();
+  });
+});
+
+document.getElementById('sidebarToggle').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  if (chart) setTimeout(() => chart.resize(), 200);
+});
+
+// ---- Clock (browser's own clock - fine for a live "current time" display) ----
+function tickClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleString();
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+// ---- Session start/uptime - driven by the BACKEND, not the browser ----
+async function fetchCurrentSession() {
+  try {
+    const resp = await fetch('/api/session/current');
+    if (!resp.ok) throw new Error('not ready yet');
+    const data = await resp.json();
+    sessionStartedAt = new Date(data.started_at);
+    document.getElementById('sessionStartTime').textContent = sessionStartedAt.toLocaleTimeString();
+  } catch (err) {
+    setTimeout(fetchCurrentSession, 1500);
+  }
+}
+fetchCurrentSession();
+
+function tickUptime() {
+  if (!sessionStartedAt) return;
+  const diff = Date.now() - sessionStartedAt.getTime();
+  const s = Math.floor(diff / 1000) % 60;
+  const m = Math.floor(diff / 60000) % 60;
+  const h = Math.floor(diff / 3600000);
+  document.getElementById('dashboardUptime').textContent = `${h}h ${m}m ${s}s`;
+}
+tickUptime();
+setInterval(tickUptime, 1000);
+
+// ---- Connection state ----
+const ONLINE_DOTS = ['dotDashboard', 'dotDatabase', 'dotRealtime', 'dotSensorLink', 'footerStatusDot'];
+function setConnectionState(isOnline) {
+  ONLINE_DOTS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('offline', !isOnline);
+  });
+  document.getElementById('lblDashboard').textContent = isOnline ? 'Operational' : 'Unreachable';
+  document.getElementById('lblDatabase').textContent = isOnline ? 'Connected' : 'Unknown';
+  document.getElementById('lblRealtime').textContent = isOnline ? 'Connected' : 'Disconnected';
+  document.getElementById('lblSensorLink').textContent = isOnline ? 'Active' : 'Offline';
+  document.getElementById('footerStatusText').textContent = isOnline ? 'SENSOR LINK ACTIVE' : 'BACKEND OFFLINE';
+}
+socket.on('connect', () => {
+  setConnectionState(true);
+  fetchCurrentSession();
+  fetchSessionLog();
+});
+socket.on('disconnect', () => {
+  setConnectionState(false);
+});
+
+// ---- Session Log page ----
+function formatDuration(startIso, endIso) {
+  const start = new Date(startIso).getTime();
+  const end = endIso ? new Date(endIso).getTime() : Date.now();
+  const diff = Math.max(0, end - start);
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor(diff / 60000) % 60;
+  const s = Math.floor(diff / 1000) % 60;
+  return `${h}h ${m}m ${s}s`;
+}
+
+async function fetchSessionLog() {
+  const tbody = document.getElementById('sessionLogBody');
+  try {
+    const resp = await fetch('/api/sessions');
+    const sessions = await resp.json();
+    if (!sessions.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No sessions recorded yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = sessions.map(s => {
+      const started = new Date(s.started_at).toLocaleString();
+      let ended, duration;
+      if (s.ended_at) {
+        ended = new Date(s.ended_at).toLocaleString();
+        duration = formatDuration(s.started_at, s.ended_at);
+      } else if (s.id === sessions[0].id) {
+        ended = '<span style="color:var(--green)">Still Running</span>';
+        duration = formatDuration(s.started_at, null);
+      } else {
+        ended = '<span style="color:var(--amber)">Did Not Shut Down Cleanly</span>';
+        duration = '—';
+      }
+      return `<tr>
+        <td>#${s.id}</td>
+        <td>${started}</td>
+        <td>${ended}</td>
+        <td>${duration}</td>
+        <td>${s.total_alerts ?? '—'}</td>
+        <td>${s.high_severity_count ?? '—'}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Could not load session history</td></tr>';
+  }
+}
+fetchSessionLog();
+setInterval(() => {
+  const runningCell = document.querySelector('#sessionLogBody tr:first-child td:nth-child(4)');
+  if (runningCell && document.querySelector('#sessionLogBody tr:first-child td:nth-child(3)')?.textContent.includes('Still Running') && sessionStartedAt) {
+    runningCell.textContent = formatDuration(sessionStartedAt.toISOString(), null);
+  }
+}, 1000);
+
+function severityClass(sev) {
+  if (sev === 'high') return 'sev-high';
+  if (sev === 'low') return 'sev-low';
+  return 'sev-medium';
+}
+
+// ---- Threat scoring heuristic ----
+const TECHNIQUE_WEIGHT = {
+  dns_tunneling: 12,
+  brute_force_admin: 10,
+  blacklisted_ip: 15,
+  syn_flood: 6,
+  icmp_flood: 5,
+  stealth_scan_null: 5,
+  stealth_scan_fin: 5,
+  stealth_scan_xmas: 5,
+  admin_port_access: 6,
+  large_packet: 4,
+  port_scan: 3
+};
+
+function threatScore(alert) {
+  const base = alert.severity === 'high' ? 70 : alert.severity === 'medium' ? 40 : 15;
+  const techBonus = TECHNIQUE_WEIGHT[alert.event_type] || 0;
+  const externalBonus = (alert.geo && alert.geo.is_private === false) ? 12 : 0;
+  return Math.max(0, Math.min(100, base + techBonus + externalBonus));
+}
+
+function scoreColor(score) {
+  if (score >= 70) return '#ff4757';
+  if (score >= 40) return '#f0a83c';
+  return '#4fc3f7';
+}
+
+function threatLevelLabel(avgScore) {
+  if (avgScore >= 70) return 'CRITICAL';
+  if (avgScore >= 40) return 'ELEVATED';
+  return 'LOW';
+}
+
+function locationCell(alert) {
+  const geo = alert.geo || {};
+  if (geo.is_private) {
+    return '<span class="loc internal"><span class="flag-dot"></span>Internal / LAN</span>';
+  }
+  if (geo.country) {
+    const place = geo.city ? `${geo.city}, ${geo.country}` : geo.country;
+    return `<span class="loc external"><span class="flag-dot"></span>${place}</span>`;
+  }
+  return '<span class="loc">Unknown</span>';
+}
+
+function scoreCell(score) {
+  const color = scoreColor(score);
+  return `
+    <div class="score-bar-wrap">
+      <div class="score-bar-track"><div class="score-bar-fill" style="width:${score}%; background:${color};"></div></div>
+      <span class="score-num" style="color:${color}">${score}</span>
+    </div>`;
+}
+
+function renderRow(a, isNew) {
+  const row = document.createElement('tr');
+  if (isNew) row.className = 'new-row';
+  const score = threatScore(a);
+  const titleBits = [];
+  if (a.dest_ip) titleBits.push(`dest: ${a.dest_ip}`);
+  if (a.signature) titleBits.push(`sig: ${a.signature}`);
+  row.title = titleBits.join(' | ');
+  row.innerHTML = `
+    <td>${new Date(a.timestamp).toLocaleTimeString()}</td>
+    <td>${a.source_ip}</td>
+    <td>${a.event_type.replace(/_/g, ' ')}</td>
+    <td><span class="sev ${severityClass(a.severity)}">${a.severity.toUpperCase()}</span></td>
+    <td class="mitre">${a.mitre.id} - ${a.mitre.name}</td>
+    <td>${locationCell(a)}</td>
+    <td>${scoreCell(score)}</td>
+  `;
+  if (firstAlert) { alertBody.innerHTML = ''; firstAlert = false; }
+  alertBody.prepend(row);
+}
+
+// ---- Step 4: Clear/Reset view buttons ----
+// Visual-only, exactly like a terminal `clear`. NEVER deletes anything
+// from MySQL - a page refresh or backend restart still pulls the full
+// history, and the Session Log page (built in 3.8) is a permanent
+// record regardless of what's been cleared from any of these views.
+
+// Moves this user's cursor for `view` forward to "now" on the backend
+// (POST /api/clears -> INSERT ... ON DUPLICATE KEY UPDATE in user_clears),
+// so the Clear survives a refresh instead of being purely cosmetic. Updates
+// the local clearCursors copy from the server's response so it stays in
+// sync with what's actually stored. If the request fails (backend down,
+// network blip), the DOM still gets wiped by the caller - it just won't
+// stay cleared after the next refresh, which is logged here for debugging.
+async function postClearCursor(view) {
+  try {
+    const resp = await fetch('/api/clears', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ view })
+    });
+    if (!resp.ok) throw new Error(`POST /api/clears returned ${resp.status}`);
+    const data = await resp.json();
+    clearCursors[view] = data.cleared_at;
+  } catch (err) {
+    console.error(`Could not persist Clear for "${view}" - it will reappear after a refresh:`, err);
+  }
+}
+
+// Live Alerts: this table is built incrementally (renderRow prepends
+// one row per new alert), so wiping it and re-arming `firstAlert` makes
+// the next real alert behave exactly like the very first page load did.
+function clearLiveAlerts() {
+  alertBody.innerHTML = '<tr><td colspan="7" class="empty">View cleared — new alerts will appear here as they arrive</td></tr>';
+  firstAlert = true;
+  postClearCursor('live_alerts');
+}
+
+// Live Traffic Monitor: same pattern as Live Alerts, using its own
+// "first line wipes the placeholder" flag.
+function clearTrafficMonitor() {
+  trafficFeed.innerHTML = '<div class="traffic-line dim">View cleared — new traffic samples will appear here as they arrive</div>';
+  firstTraffic = true;
+  postClearCursor('traffic');
+}
+
+// Overview's Recent Activity is different: it's fully re-rendered from
+// allAlerts every time (not incremental), so a simple innerHTML wipe
+// would just get overwritten on the next alert. recentActivityCleared
+// tells renderRecentActivity() to stay empty until a new alert actually
+// arrives, at which point the 'new_alert' handler resets the flag.
+let recentActivityCleared = false;
+function clearRecentActivity() {
+  recentActivityCleared = true;
+  document.getElementById('recentActivityBody').innerHTML =
+    '<tr><td colspan="5" class="empty">View cleared — new alerts will appear here as they arrive</td></tr>';
+  postClearCursor('recent_activity');
+}
+
+// The three functions above are defined inside initDashboard()'s local
+// scope (because the whole dashboard got wrapped in that function for
+// the auth-gate feature). The Clear buttons in the HTML use inline
+// onclick="..." attributes, which can ONLY call functions that exist on
+// the global `window` object - they cannot see anything local to
+// initDashboard(). Without this, clicking Clear silently does nothing
+// (no error, no console log - the browser just can't find the function).
+// This explicitly attaches all three to `window` so the buttons work.
+window.clearLiveAlerts = clearLiveAlerts;
+window.clearTrafficMonitor = clearTrafficMonitor;
+window.clearRecentActivity = clearRecentActivity;
+
+function renderRecentActivity() {
+  if (recentActivityCleared) return; // stays cleared until a new alert un-clears it
+  const tbody = document.getElementById('recentActivityBody');
+  const recent = allAlerts
+    .filter(a => !isBeforeOrAtCursor(a.timestamp, clearCursors.recent_activity))
+    .slice(0, 5);
+  if (recent.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Waiting for alerts...</td></tr>';
+    return;
+  }
+  tbody.innerHTML = recent.map(a => {
+    const score = threatScore(a);
+    return `<tr>
+      <td>${new Date(a.timestamp).toLocaleTimeString()}</td>
+      <td>${a.source_ip}</td>
+      <td>${a.event_type.replace(/_/g, ' ')}</td>
+      <td><span class="sev ${severityClass(a.severity)}">${a.severity.toUpperCase()}</span></td>
+      <td>${scoreCell(score)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---- Stat strip + technique list + origins, recomputed from allAlerts ----
+function refreshDerivedPanels() {
+  const total = allAlerts.length;
+  const highCount = allAlerts.filter(a => a.severity === 'high').length;
+  const sources = new Set(allAlerts.map(a => a.source_ip));
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statHigh').textContent = highCount;
+  document.getElementById('statHighSub').textContent = total ? `${Math.round(highCount / total * 100)}% of total` : '0% of total';
+  document.getElementById('statSources').textContent = sources.size;
+
+  const recent = allAlerts.slice(0, 15);
+  const avgScore = recent.length ? Math.round(recent.reduce((s, a) => s + threatScore(a), 0) / recent.length) : 0;
+  const level = recent.length ? threatLevelLabel(avgScore) : '-';
+  const levelEl = document.getElementById('statLevel');
+  levelEl.textContent = recent.length ? `${level} (${avgScore})` : '-';
+  levelEl.className = 'stat-value level-' + level;
+
+  const techCounts = {};
+  allAlerts.forEach(a => {
+    const key = a.mitre.id + '|' + a.mitre.name;
+    techCounts[key] = (techCounts[key] || 0) + 1;
+  });
+  const sortedTech = Object.entries(techCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const techEl = document.getElementById('techniqueList');
+  if (sortedTech.length === 0) {
+    techEl.innerHTML = '<div class="empty">No alerts yet</div>';
+  } else {
+    techEl.innerHTML = sortedTech.map(([key, count]) => {
+      const [id, name] = key.split('|');
+      return `<div class="technique-row"><span class="tname">${name}<span class="tid">${id}</span></span><span class="tcount">${count}</span></div>`;
+    }).join('');
+  }
+
+  const bySource = {};
+  allAlerts.forEach(a => {
+    if (!bySource[a.source_ip]) bySource[a.source_ip] = { alert: a, count: 0 };
+    bySource[a.source_ip].count++;
+  });
+  const originEl = document.getElementById('originList');
+  const originEntries = Object.values(bySource).sort((a, b) => b.count - a.count).slice(0, 10);
+  if (originEntries.length === 0) {
+    originEl.innerHTML = '<div class="empty">No geolocated alerts yet</div>';
+  } else {
+    originEl.innerHTML = originEntries.map(({ alert, count }) => {
+      const geo = alert.geo || {};
+      const place = geo.is_private ? 'Internal / LAN' : (geo.country ? (geo.city ? `${geo.city}, ${geo.country}` : geo.country) : 'Location unknown');
+      const badgeColor = geo.is_private ? '#445563' : '#ff4757';
+      const badgeText = geo.is_private ? 'INTERNAL' : 'EXTERNAL';
+      return `
+        <div class="origin-row">
+          <div class="origin-top">
+            <span class="origin-ip">${alert.source_ip}</span>
+            <span class="origin-badge" style="background:${badgeColor}33; color:${badgeColor}">${badgeText}</span>
+          </div>
+          <div class="origin-place">${place} &middot; ${count} alert${count === 1 ? '' : 's'}</div>
+        </div>`;
+    }).join('');
+  }
+
+  renderRecentActivity();
+  updateLastAlertReceived();
+}
+
+function updateLastAlertReceived() {
+  const el = document.getElementById('lastAlertReceived');
+  if (!el) return;
+  if (allAlerts.length === 0) { el.textContent = '--'; return; }
+  el.textContent = new Date(allAlerts[0].timestamp).toLocaleTimeString();
+}
+
+// --- Live Traffic Monitor (separate from alerts entirely) ---
+const trafficFeed = document.getElementById('trafficFeed');
+let firstTraffic = true;
+const MAX_VISIBLE_TRAFFIC_LINES = 60;
+
+function renderTrafficLine(t) {
+  if (firstTraffic) { trafficFeed.innerHTML = ''; firstTraffic = false; }
+  const line = document.createElement('div');
+  line.className = 'traffic-line';
+  const time = new Date(t.timestamp).toLocaleTimeString();
+  line.innerHTML = `<span class="dim">${time}</span>  ${t.source_ip} -> Port ${t.dst_port} <span class="dim">(${t.bytes} bytes)</span>`;
+  trafficFeed.prepend(line);
+
+  while (trafficFeed.children.length > MAX_VISIBLE_TRAFFIC_LINES) {
+    trafficFeed.removeChild(trafficFeed.lastChild);
+  }
+}
+
+// Load existing history on page load - but first find out where (if
+// anywhere) this user's three Clear cursors currently sit, so the
+// alerts/traffic fetches below can filter out anything at-or-before the
+// matching cursor before they ever render. A cursor only affects this
+// initial load/refresh pass - anything arriving later over Socket.io
+// (new_alert / traffic_sample) always renders immediately regardless.
+async function loadClearCursorsThenData() {
+  try {
+    const resp = await fetch('/api/clears');
+    if (resp.ok) {
+      clearCursors = await resp.json();
+    }
+  } catch (err) {
+    console.error('Could not load clear cursors - showing full history:', err);
+  }
+
+  fetch('/api/alerts').then(r => r.json()).then(data => {
+    // allAlerts keeps the FULL history (stats/scoring panels and the
+    // Recent Activity panel each filter it themselves against their own
+    // cursor) - only what actually gets drawn into the Live Alert Feed
+    // table below is filtered against the live_alerts cursor.
+    allAlerts = data.slice();
+    const visibleForFeed = data.filter(a => !isBeforeOrAtCursor(a.timestamp, clearCursors.live_alerts));
+    if (visibleForFeed.length > 0) {
+      visibleForFeed.slice().reverse().forEach(a => renderRow(a, false));
+    } else if (data.length > 0) {
+      // History exists but this user cleared it - show the same
+      // placeholder Clear itself shows, instead of the default
+      // "Waiting for alerts..." markup already in the page.
+      alertBody.innerHTML = '<tr><td colspan="7" class="empty">View cleared — new alerts will appear here as they arrive</td></tr>';
+      firstAlert = false;
+    }
+    refreshDerivedPanels();
+    refreshChart();
+  });
+
+  fetch('/api/traffic').then(r => r.json()).then(data => {
+    const visibleTraffic = data.filter(t => !isBeforeOrAtCursor(t.timestamp, clearCursors.traffic));
+    if (visibleTraffic.length > 0) {
+      visibleTraffic.forEach(t => renderTrafficLine(t));
+    } else if (data.length > 0) {
+      trafficFeed.innerHTML = '<div class="traffic-line dim">View cleared — new traffic samples will appear here as they arrive</div>';
+      firstTraffic = false;
+    }
+  });
+}
+loadClearCursorsThenData();
+
+socket.on('traffic_sample', (sample) => {
+  renderTrafficLine(sample);
+});
+
+// Live push - new alert
+socket.on('new_alert', (alert) => {
+  allAlerts.unshift(alert);
+  renderRow(alert, true);
+  recentActivityCleared = false; // a new alert arriving un-clears the Recent Activity view
+  refreshChart();
+  refreshDerivedPanels();
+  fetchSessionLog(); // keep the running session's Total Alerts/High Severity columns live, not just on reconnect
+});
+
+
+// Chart
+let chart;
+function refreshChart() {
+  fetch('/api/stats').then(r => r.json()).then(counts => {
+    const labels = Object.keys(counts);
+    const values = Object.values(counts);
+    const total = values.reduce((a, b) => a + b, 0);
+
+    const statsListEl = document.getElementById('statsList');
+    if (labels.length === 0) {
+      statsListEl.innerHTML = '<div class="empty">No alerts yet</div>';
+    } else {
+      statsListEl.innerHTML = labels.map((label, i) => {
+        const pct = total ? Math.round(values[i] / total * 100) : 0;
+        return `<div class="stat-row"><span>${label.replace(/_/g, ' ')}</span><span class="count">${values[i]} <span style="color:var(--text-faint)">(${pct}%)</span></span></div>`;
+      }).join('');
+    }
+
+    if (!chart) {
+      chart = new Chart(document.getElementById('chart'), {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{ data: values, backgroundColor: ['#ff4757', '#f0a83c', '#4fc3f7', '#a78bfa', '#4ade80', '#ec4899', '#14b8a6', '#fbbf24', '#38bdf8', '#f472b6'] }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#d7e4ea', boxWidth: 12, font: { size: 11, family: "'JetBrains Mono', monospace" } } } }
+        }
+      });
+    } else {
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = values;
+      chart.update();
+    }
+  });
+}
+refreshChart();
+} // end of initDashboard()
+</script>
+
+</body>
+</html>
