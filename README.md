@@ -16,7 +16,7 @@
 
 ---
 
-## 📋 Executive Summary
+##  Executive Summary
 
 **NETGUARD** is a self-hosted SOC (Security Operations Center) management and threat analysis platform. It combines a custom low-level packet-capture sensor with continuous stream ingestion, automated MITRE ATT&CK mapping, heuristic threat scoring, and real-time incident visualization into a single control plane.
 
@@ -26,7 +26,7 @@ Every remediation action shown in the dashboard is a **human-authorized recommen
 
 ---
 
-## ⚡ Key Features
+##  Key Features
 
 - **Live Telemetry Engine** — event streaming powered by WebSockets (`Socket.io`) for low-latency incident visualization across every connected dashboard session.
 - **8-Module Detection Engine** — port scanning, SYN flood, ICMP flood, stealth scans (NULL/FIN/XMAS), admin-port brute force, DNS-tunneling heuristic, anomalous packet size (EMA-baseline anomaly detection), and known-bad IP matching.
@@ -39,7 +39,7 @@ Every remediation action shown in the dashboard is a **human-authorized recommen
 
 ---
 
-## 🖼️ Dashboard Preview
+##  Dashboard Preview
 
 <table>
 <tr>
@@ -58,7 +58,7 @@ Every remediation action shown in the dashboard is a **human-authorized recommen
 
 ---
 
-## 🏗️ System Architecture
+##  System Architecture
 
 ```
 ┌──────────────────┐     HTTP POST      ┌───────────────────┐     Socket.io      ┌───────────────────┐
@@ -78,7 +78,7 @@ Full breakdown of detection-rule logic, auth design, and the remediation/clear-c
 
 ---
 
-## 🎯 Attack Simulators
+##  Attack Simulators
 
 The `sensor/` module doubles as its own test harness — point it at a bridged VM (e.g. Kali Linux) running standard tools to trigger each detection module live:
 
@@ -92,7 +92,7 @@ The `sensor/` module doubles as its own test harness — point it at a bridged V
 
 ---
 
-## 🚀 Installation
+##  Installation
 
 ### Prerequisites
 - Windows + [XAMPP](https://www.apachefriends.org/) (MySQL/MariaDB)
@@ -117,11 +117,11 @@ g++ ids_real.cpp -o ids_real.exe -IC:\WpdPack\Include -LC:\WpdPack\Lib\x64 -lwpc
 ./ids_real.exe
 ```
 
-> ⚠️ Training/demonstration system — not hardened for production or internet-facing deployment.
+>  Training/demonstration system — not hardened for production or internet-facing deployment.
 
 ---
 
-## 📡 API Reference
+##  API Reference
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
@@ -140,7 +140,7 @@ g++ ids_real.cpp -o ids_real.exe -IC:\WpdPack\Include -LC:\WpdPack\Lib\x64 -lwpc
 
 ---
 
-## 🗺️ Roadmap
+##  Roadmap
 
 - [x] Simulated Remediation (Authorize-to-Act)
 - [x] Full auth system (register / login / session / RBAC)
@@ -154,7 +154,7 @@ Detailed dev-continuity notes: **[docs/HANDOFF.md](docs/HANDOFF.md)**
 
 ---
 
-## 🧰 Tech Stack
+##  Tech Stack
 
 `C++` `WinSock2` `Npcap` · `Node.js` `Express` `Socket.io` `mysql2` `bcryptjs` · `MySQL / MariaDB` · `HTML` `CSS` `Vanilla JS`
 
@@ -166,5 +166,6 @@ MIT — see [LICENSE](LICENSE)
 
 ## ✍️ Author
 
-**Ragib Shahriar Abeg**
-Cyber Security Engineering Student, University of Frontier Technology, Bangladesh
+**Ragib Shahriar Abeg**  
+Cyber Security Engineering Student   
+University of Frontier Technology, Bangladesh
