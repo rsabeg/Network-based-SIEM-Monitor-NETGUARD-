@@ -16,7 +16,7 @@
 
 ---
 
-## 📋 Executive Summary
+##  Executive Summary
 
 **NETGUARD** is a self-hosted SOC (Security Operations Center) management and threat analysis platform. It combines a custom low-level packet-capture sensor with continuous stream ingestion, automated MITRE ATT&CK mapping, heuristic threat scoring, and real-time incident visualization into a single control plane.
 
@@ -39,7 +39,7 @@ Every remediation action shown in the dashboard is a **human-authorized recommen
 
 ---
 
-## 🖼️ Dashboard Preview
+##  Dashboard Preview
 
 <table>
 <tr>
@@ -78,7 +78,7 @@ Full breakdown of detection-rule logic, auth design, and the remediation/clear-c
 
 ---
 
-## 🎯 Attack Simulators
+##  Attack Simulators
 
 The `sensor/` module doubles as its own test harness — point it at a bridged VM (e.g. Kali Linux) running standard tools to trigger each detection module live:
 
@@ -117,7 +117,7 @@ g++ ids_real.cpp -o ids_real.exe -IC:\WpdPack\Include -LC:\WpdPack\Lib\x64 -lwpc
 ./ids_real.exe
 ```
 
-> ⚠️ Training/demonstration system — not hardened for production or internet-facing deployment.
+>  Training/demonstration system — not hardened for production or internet-facing deployment.
 
 ---
 
@@ -154,7 +154,7 @@ Detailed dev-continuity notes: **[docs/HANDOFF.md](docs/HANDOFF.md)**
 
 ---
 
-## 🧰 Tech Stack
+##  Tech Stack
 
 `C++` `WinSock2` `Npcap` · `Node.js` `Express` `Socket.io` `mysql2` `bcryptjs` · `MySQL / MariaDB` · `HTML` `CSS` `Vanilla JS`
 
